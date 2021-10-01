@@ -19,25 +19,51 @@ import com.sun.org.apache.xerces.internal.impl.dv.util.Base64;
 import kong.unirest.HttpResponse;
 import kong.unirest.JsonNode;
 import kong.unirest.Unirest;
+import kong.unirest.json.JSONObject;
 
 public class CosmosHelper {
 	
+	private String host;
+	private String key;
+	//private String db;
+	//private String col;
 	
+	public CosmosHelper(String host, String key) {
+		this.host = host;
+		this.key = key;
+		//this.db = db;
+		//this.col = col;
+	}
 	
-	private Configurations config = new Configurations();
+	//private Configurations config = new Configurations();
 	
-	public JsonNode getMetaData() {
-		JsonNode jsonNode = null;
+	public JSONObject getAccountDetails(String resourceType) {
+		JSONObject accountDetails = null;
+		JsonNode jsonNode = get(this.host, resourceType);
+		if(jsonNode != null) {
+			accountDetails = jsonNode.getObject();
+		}
+		return accountDetails;
+	}
+	
+	public JsonNode getMetaData(String regionHost, String resourceType) {
 		
+		String url = regionHost + "/addresses/?$resolveFor=dbs&$filter=protocol%20eq%20rntbd";
+		return get(url, resourceType);
+	}
+	
+	private JsonNode get(String url, String resourceType) {
+		JsonNode jsonNode = null;
+		System.out.println(url);
 		try {
 			String date = getDateTime().toLowerCase();
 			System.out.println(date);
-			String token = getToken(date);
+			String token = getToken(date, resourceType);
 			System.out.println(token);
-			String url = config.getProperty("host") + "/addresses/?$resolveFor=dbs&$filter=protocol%20eq%20rntbd";
+			//String url = config.getProperty("host") + "/addresses/?$resolveFor=dbs&$filter=protocol%20eq%20rntbd";
 			
-			System.out.println(url);
-		
+			//String url = this.host + "/addresses/?$resolveFor=dbs&$filter=protocol%20eq%20rntbd";
+			
 			HttpResponse<JsonNode> response = Unirest.get(url)
 												.header("accept", "application//json")
 												.header("Content-Type", "application//json")
@@ -53,20 +79,19 @@ public class CosmosHelper {
 		return jsonNode;
 	}
 	
-	private String getToken(String date) {
+	private String getToken(String date, String resourceType) {
 		String authToken = "";
 		String masterToken = "master";
 		String tokenVersion = "1.0";
 		//hard coding  to GET
 		String verb = "GET";
-		String resourceType = "dbs";
 		String resourceLink = "";
 		String algo = "HMACSHA256";
 		try {
-			String key = config.getProperty("key");
-			System.out.println(key);
+			//String key = config.getProperty("key");
+			//System.out.println(key);
 			Mac macSha256 = Mac.getInstance(algo);
-			SecretKeySpec secretKey = new SecretKeySpec(Base64.decode(key), algo);
+			SecretKeySpec secretKey = new SecretKeySpec(Base64.decode(this.key), algo);
 			macSha256.init(secretKey);
 			String data = verb.toLowerCase() + "\n"
 						  	+ resourceType.toLowerCase() + "\n"
