@@ -13,23 +13,29 @@ import kong.unirest.json.JSONObject;
 public class CosmosMetadataApplication {
 
 	public static void main(String[] args) {
-		
+		Configurations config = new Configurations();
 		String host = "";
 		String key = "";
-		JSONObject accountDetails = null;
-		JSONArray readRegions = null;
-		JSONArray writeRegions = null;
-		List<JsonNode> allEndpoints = new ArrayList<JsonNode>();
+		String databaseRid = "";
+		String collectionRid = "";
 		
-		if(args.length < 2) {
-			System.out.println("Please provide host and key as arguments");
-		}
-		else  {
-			host = args[0];
-			key = args[1];
+		
+		try {
+			host = config.getProperty("host");
+			key = config.getProperty("key");
+			databaseRid = config.getProperty("dbRid");
+			collectionRid = config.getProperty("colRid");
 			
-			CosmosHelper cosmosHelper = new CosmosHelper(host, key);
-			accountDetails = cosmosHelper.getAccountDetails("");
+			JSONObject accountDetails = null;
+			JsonNode databaseResponse = null;
+			
+			JSONArray readRegions = null;
+			JSONArray writeRegions = null;
+			List<JsonNode> allEndpoints = new ArrayList<JsonNode>();
+		
+			CosmosHelper cosmosHelper = new CosmosHelper(host, key, databaseRid, collectionRid);
+			accountDetails = cosmosHelper.getAccountDetails();
+			
 			System.out.print(System.lineSeparator());
 			System.out.println("############Account Details##########");
 			System.out.println(accountDetails.toString());
@@ -39,35 +45,42 @@ public class CosmosMetadataApplication {
 			if(accountDetails != null) {
 				readRegions = accountDetails.getJSONArray("readableLocations");
 				writeRegions = accountDetails.getJSONArray("writableLocations");
-				System.out.print(System.lineSeparator());
-				System.out.println("############Read Regions##########");
-				System.out.println("Read Regions:");
-				System.out.println(readRegions);
-				System.out.println("############END Read Regions##########");
-				System.out.print(System.lineSeparator());
-				System.out.println("############Write Regions##########");
-				System.out.println("Write Regions:");
-				System.out.println(writeRegions);
-				System.out.println("############End Write Regions##########");
-				System.out.print(System.lineSeparator());
-				for(int i=0;i<writeRegions.length();i++) {
-					readRegions.put(writeRegions.get(i));
-				}
-				if(readRegions != null) {
-					for(int i=0;i<readRegions.length();i++) {
-						JSONObject readRegion = readRegions.getJSONObject(i);
-						JsonNode responseData = cosmosHelper.getMetaData(readRegion.getString("databaseAccountEndpoint"), "dbs");
-						System.out.println(responseData.toPrettyString());
-						allEndpoints.add(responseData);
+			}
+			
+			
+			databaseResponse = cosmosHelper.getAllDatabases();
+			System.out.println(databaseResponse.toPrettyString());
+			JSONObject databaseJsonObject =  databaseResponse.getObject();
+			
+			if(databaseJsonObject != null) {
+				List<Database> dbs = cosmosHelper.castDatabases(databaseJsonObject.getJSONArray("Databases"));
+				for(int i=0;i<dbs.size();i++) {
+					JsonNode collectionResponse = cosmosHelper.getAllCollections(dbs.get(i));
+					JSONObject collectionJsonObject = collectionResponse.getObject();
+					if(collectionJsonObject != null) {
+						List<Collection> colls = cosmosHelper.castCollections(collectionJsonObject.getJSONArray("DocumentCollections"));
+						for(int j =0;j<colls.size();j++) {
+							for(int k=0;k<readRegions.length();k++) {
+								JSONObject readRegion = readRegions.getJSONObject(k);
+								JsonNode responseData = cosmosHelper.getMetaData(readRegion.getString("databaseAccountEndpoint"),dbs.get(i).getRid(), colls.get(j).getRid());
+								allEndpoints.add(responseData);
+							}
+						}
 					}
 				}
 			}
 			for(JsonNode endpoint: allEndpoints) {
 				System.out.println(endpoint.toPrettyString());
-			}
-			
-			/* */
+			}	
 		}
+		catch(Exception exp) {
+			System.out.println(exp.getMessage());
+		}
+		
+		
+		
 	}
+	
+	
 
 }
